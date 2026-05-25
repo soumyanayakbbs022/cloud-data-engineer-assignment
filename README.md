@@ -118,13 +118,6 @@ Bronze-layer profiling queries analyze:
 - significantly late records
 - batch-level reconciliation metrics
 
-Key SQL concepts used:
-
-- `COUNTIF()`
-- `SAFE_CAST()`
-- `TIMESTAMP_DIFF()`
-- `STRING_AGG()`
-- CTE-based modular SQL
 
 **Implementation:** `sql/03_issues_identification.sql`
 
@@ -190,7 +183,7 @@ The implementation prioritizes replayability, auditability, and observability ov
 
 ## Design Decisions
 
-- Bronze intentionally preserves dirty values and duplicate records
+- Bronze preserves source data in its original form
 - Deduplication is deferred to Silver using latest-ingestion semantics
 - Event time and ingestion time are modeled separately for freshness analysis
 - Invalid Silver records are retained instead of dropped
@@ -239,35 +232,23 @@ Bronze ingestion configuration:
 ## Assumptions & Limitations
 
 **Assumptions**
-- duplicates simulate replay/retry ingestion behavior
-- latest ingestion version should be retained
-- Bronze preserves raw source values exactly
-- invalid Silver records remain queryable
-- freshness is calculated using ingestion delay
+- latest ingestion version is retained
+- Bronze preserves source data in “as-is” form
 - late-arriving threshold defined as >120 minutes
-- significantly late threshold defined as >1440 minutes
 
 **Current limitations**
-- no orchestration framework
+- no orchestration or CI/CD
 - no streaming ingestion
-- no automated alerting integration
-- no CI/CD implementation
-- no automated testing framework
-- no incremental MERGE-based processing
+- no automated testing or alerting
 
 ---
 
 ## Future Enhancements
 
-- orchestration using Airflow
-- dbt-based transformation framework
+- Airflow orchestration
+- dbt-based transformations
 - incremental Silver processing
-- automated alerting integration
-- schema evolution handling
-- CI/CD pipelines
-- monitoring dashboards
-- automated testing framework
-- GCS landing zone integration
+- CI/CD and automated monitoring
 
 ---
 
@@ -292,6 +273,15 @@ Silver-layer validation confirmed:
 - invalid records classified using `invalid_reason`
 - freshness metrics generated correctly
 - Bronze → Silver reconciliation logic executed successfully
+
+---
+
+## Caveats
+
+- Late-arriving row counts exceeded the originally targeted simulation range due to broader replay and ingestion-delay scenarios introduced during data generation.
+- Replay-driven duplicate behavior was intentionally modeled across multiple ingestion batches to better simulate real-world retry and reprocessing patterns.
+- Invalid records are intentionally retained in Silver with quality flags for auditability and downstream observability rather than being dropped.
+- The implementation prioritizes operational realism and observability over deterministic synthetic data distribution.
 
 ---
 
