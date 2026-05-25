@@ -69,8 +69,8 @@ cloud-data-engineer-assignment/
 | Batch | Rows |
 |---|---:|
 | batch_01.csv | 32,925 |
-| batch_02.csv | 33,533 |
-| batch_03.csv | 33,542 |
+| batch_02.csv | 33,534 |
+| batch_03.csv | 33,541 |
 | Total | 100,000 |
 
 Injected ingestion edge cases:
@@ -259,13 +259,13 @@ Observed results from the executed pipeline:
 | Metric | Result |
 |---|---:|
 | Total Bronze rows | 100,000 |
-| Duplicate transaction rows | 2,423 |
-| Invalid quantity rows | 1,270 |
-| Invalid unit_price rows | 1,210 |
-| Missing product_id rows | 1,280 |
-| Late-arriving rows (batch_02) | 825 |
-| Late-arriving rows (batch_03) | 1,017 |
-| Significantly late rows (batch_03) | 177 |
+| Duplicate transaction rows | 2,432 |
+| Invalid quantity rows | 1,272 |
+| Invalid unit_price rows | 1,209 |
+| Missing product_id rows | 1,260 |
+| Late-arriving rows (batch_02) | 321 |
+| Late-arriving rows (batch_03) | 492 |
+| Significantly late rows (batch_03) | 184 |
 
 Silver-layer validation confirmed:
 
@@ -278,10 +278,10 @@ Silver-layer validation confirmed:
 
 ## Caveats
 
-- Late-arriving row counts exceeded the originally targeted simulation range due to broader replay and ingestion-delay scenarios introduced during data generation.
-- Replay-driven duplicate behavior was intentionally modeled across multiple ingestion batches to better simulate real-world retry and reprocessing patterns.
+- Replay-driven duplicate behavior was intentionally modeled across multiple ingestion batches to simulate retry and reprocessing scenarios.
+- Duplicate metrics represent all rows participating in replay groups, including original and replayed records.
 - Invalid records are intentionally retained in Silver with quality flags for auditability and downstream observability rather than being dropped.
-- The implementation prioritizes operational realism and observability over deterministic synthetic data distribution.
+- The implementation prioritizes operational realism and observability over perfectly deterministic synthetic data distribution.
 
 ---
 

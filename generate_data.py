@@ -213,8 +213,8 @@ for _ in range(duplicate_error_count):
     ])
 
     duplicated_row["ingestion_time"] = (
-        duplicated_row["ingestion_time"]
-        + timedelta(hours=random.randint(2, 5))
+    duplicated_row["ingestion_time"]
+    + timedelta(minutes=random.randint(10, 90))
     )
 
     target_batch.append(duplicated_row)
