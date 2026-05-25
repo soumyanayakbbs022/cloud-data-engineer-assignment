@@ -270,24 +270,20 @@ GROUP BY store_id
 ORDER BY total_revenue DESC;
 
 -- =========================================================
--- Suggested Production Alert Thresholds
+-- Suggested Data Quality Thresholds
 --
--- Late-arriving percentage:
---   Warning  > 5%
---   Critical > 15%
+-- Late data rate:
+--   < 10% is considered acceptable
 --
--- Significantly late percentage:
---   Warning  > 1%
---   Critical > 5%
+-- Invalid record rate:
+--   < 5% is considered acceptable
 --
--- Invalid record percentage:
---   Warning  > 2%
---   Critical > 10%
+-- Duplicate records in Silver:
+--   Target = 0 duplicate transaction_id values
 --
--- Reconciliation mismatch:
---   Any unexpected row-count mismatch should trigger
---   operational investigation.
+-- Any unexpected reconciliation mismatch between
+-- Bronze and Silver should trigger investigation.
 --
--- These thresholds simulate enterprise operational
--- monitoring and SLA governance practices.
+-- These thresholds simulate production-style
+-- operational monitoring and SLA governance.
 -- =========================================================

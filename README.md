@@ -1,69 +1,46 @@
 # Cloud Data Engineer (GCP) Take-Home Assignment
 ## Bronze → Silver Retail Transaction Pipeline
 
+Production-style retail transaction pipeline implemented on GCP BigQuery using a Bronze → Silver medallion architecture.
+
+The solution simulates realistic POS ingestion challenges including replayed transactions, dirty data, late-arriving records, and out-of-order events while focusing on immutable ingestion, replay-aware transformation logic, and operational observability.
+
 ---
 
-# 1. Project Overview
-
-This project implements a production-style Bronze → Silver retail transaction pipeline using:
-
-- Python 3.8+
-- Google BigQuery
-- Google Cloud Platform (GCP)
-- SQL
-- Optional Google Cloud Storage (GCS)
-
-The solution simulates a realistic retail POS ingestion environment with:
-
-- dirty data
-- duplicate transactions
-- late-arriving records
-- replay-aware ingestion behavior
-- operational data quality monitoring
-
-The pipeline follows medallion architecture principles:
+## Architecture
 
 ```text
-Raw CSV Batch Files
-        ↓
-Bronze Layer (Immutable Raw Storage)
-        ↓
-Silver Layer (Validated Analytics-Ready Data)
-        ↓
-Operational Quality Monitoring
+CSV Batch Files
+    ↓
+retail.bronze_transactions
+    ↓
+Data Profiling & Quality Analysis
+    ↓
+retail.silver_transactions
+    ↓
+Observability & Reconciliation Layer
+    ↓
+Analytics & Reporting
 ```
 
 ---
 
-# 2. Assignment Objectives
+## Key Engineering Concepts
 
-The project was designed to:
-
-- preserve raw source data exactly as received
-- identify and profile data quality issues
-- handle replayed and duplicate transactions
-- process late-arriving data
-- safely transform dirty records
-- create analytics-ready Silver tables
-- implement production-style quality monitoring
-- demonstrate operational observability and reconciliation thinking
-
----
-
-# 3. Technologies Used
-
-| Technology | Purpose |
-|---|---|
-| Python | Data generation |
-| Pandas | CSV generation and manipulation |
-| Google BigQuery | Data warehouse and SQL processing |
-| SQL | Bronze/Silver transformations and quality monitoring |
-| Git & GitHub | Version control |
-| PowerShell | Local execution |
+- Medallion architecture (Bronze → Silver)
+- Immutable raw ingestion design
+- Replay-aware deduplication
+- Event-time vs processing-time modeling
+- Late-arriving data handling
+- Dirty-data preservation philosophy
+- Validation-driven Silver transformation
+- Operational observability & reconciliation
+- BigQuery partitioning and clustering
+- Production-style data quality monitoring
 
 ---
 
-# 4. Project Structure
+## Project Structure
 
 ```text
 cloud-data-engineer-assignment/
@@ -82,55 +59,12 @@ cloud-data-engineer-assignment/
 │
 ├── generate_data.py
 ├── README.md
-├── .gitignore
-└── venv/
+└── .gitignore
 ```
 
 ---
 
-# 5. GCP & BigQuery Setup
-
-## 5.1 GCP Project
-
-Created dedicated GCP project:
-
-```text
-cloud-data-engineer-assignment
-```
-
-## 5.2 BigQuery Dataset
-
-Created dataset:
-
-```text
-retail
-```
-
-Tables created:
-
-```text
-retail.bronze_transactions
-retail.silver_transactions
-```
-
----
-
-# 6. Phase 1 — Data Generation
-
-## Objective
-
-Generate realistic retail POS transaction batches with controlled data quality issues.
-
-## Output Files
-
-```text
-data/batches/
-├── batch_01.csv
-├── batch_02.csv
-└── batch_03.csv
-```
-
-## Total Dataset Volume
+## Dataset Characteristics
 
 | Batch | Rows |
 |---|---:|
@@ -139,122 +73,70 @@ data/batches/
 | batch_03.csv | 33,542 |
 | Total | 100,000 |
 
-## Simulated Data Issues
+Injected ingestion edge cases:
 
-Exactly 5% erroneous rows were injected.
-
-| Error Type | Description |
-|---|---|
-| Duplicate transaction IDs | Replay-aware duplicate ingestion |
-| Missing product_id | Incomplete dimensional data |
-| Invalid quantity | 0, negative, malformed values |
-| Invalid unit_price | negative or malformed values |
-| Late-arriving records | freshness > 120 mins |
-| Significantly late records | freshness > 24 hours |
-| Out-of-order events | event time ordering mismatch |
-
-## Key Engineering Concepts
-
-- event time vs processing time modeling
-- deterministic error injection
-- replay-aware ingestion simulation
-- immutable raw-data philosophy
-- late-data simulation
-- production-style batch generation
+- duplicate transaction IDs replayed across ingestion batches
+- missing `product_id` values
+- invalid `quantity` values
+- invalid `unit_price` values
+- late-arriving records (>120 mins)
+- significantly late records (>24 hrs)
+- out-of-order transaction events
 
 ---
 
-# 7. Phase 2 — Bronze Layer
+## Bronze Layer
 
-## Objective
+**Table:** `retail.bronze_transactions`
 
-Implement immutable raw ingestion layer.
+The Bronze layer preserves source records exactly as received using append-only ingestion semantics.
 
-## Bronze Table
+Key characteristics:
 
-```sql
-CREATE TABLE IF NOT EXISTS retail.bronze_transactions (
-    transaction_id STRING,
-    store_id STRING,
-    product_id STRING,
-    quantity STRING,
-    unit_price STRING,
-    transaction_time TIMESTAMP,
-    ingestion_time TIMESTAMP,
-    source_batch STRING
-)
-PARTITION BY DATE(ingestion_time);
-```
+- immutable raw storage
+- dirty-value preservation
+- replay-aware ingestion history
+- ingestion-time partitioning
+- `source_batch` lineage tracking
 
-## Bronze Design Principles
+Schema intentionally stores `quantity` and `unit_price` as `STRING` to preserve malformed upstream values without ingestion failure.
 
-| Principle | Implementation |
-|---|---|
-| Preserve raw truth | no cleansing/filtering |
-| Replayability | append-only ingestion |
-| Dirty-data preservation | quantity/unit_price stored as STRING |
-| Auditability | source_batch metadata |
-| Cost optimization | ingestion-time partitioning |
+Bronze ingestion is partitioned by `DATE(ingestion_time)` to optimize scan cost and partition pruning.
 
-## Important Implementation Details
-
-- append-only loading used
-- dirty values intentionally preserved
-- header parsing issue resolved using:
-  - skip header rows = 1
+**Implementation:** `sql/02_bronze_load.sql`
 
 ---
 
-# 8. Phase 3 — Data Issues Identification
+## Data Profiling & Quality Analysis
 
-## Objective
+Bronze-layer profiling queries analyze:
 
-Profile Bronze-layer data quality issues before Silver transformations.
+- replayed transactions
+- completeness issues
+- invalid numeric values
+- late-arriving records
+- significantly late records
+- batch-level reconciliation metrics
 
-## SQL File
+Key SQL concepts used:
 
-```text
-sql/03_issues_identification.sql
-```
+- `COUNTIF()`
+- `SAFE_CAST()`
+- `TIMESTAMP_DIFF()`
+- `STRING_AGG()`
+- CTE-based modular SQL
 
-## Implemented Quality Checks
-
-| Quality Check | Purpose |
-|---|---|
-| Duplicate detection | replay analysis |
-| Missing field analysis | completeness monitoring |
-| Invalid numeric validation | dirty-data profiling |
-| Late-arriving analysis | freshness SLA monitoring |
-| Significantly late analysis | outage/replay detection |
-| Batch-level summaries | operational observability |
-
-## Important SQL Concepts Used
-
-- COUNTIF()
-- SAFE_CAST()
-- TIMESTAMP_DIFF()
-- STRING_AGG()
-- CTEs
-- GROUP BY
-- HAVING
+**Implementation:** `sql/03_issues_identification.sql`
 
 ---
 
-# 9. Phase 4 — Silver Layer
+## Silver Layer
 
-## Objective
+**Table:** `retail.silver_transactions`
 
-Transform Bronze raw data into analytics-ready Silver layer.
+Silver transformations apply replay-aware deduplication, `SAFE_CAST()`-based normalization, validation-driven quality classification, and freshness enrichment to produce analytics-ready transaction records.
 
-## Silver Table
-
-```text
-retail.silver_transactions
-```
-
-## Deduplication Strategy
-
-Implemented using:
+Deduplication logic:
 
 ```sql
 ROW_NUMBER() OVER (
@@ -263,320 +145,168 @@ ROW_NUMBER() OVER (
 )
 ```
 
-Purpose:
+Generated enrichments include transaction-level revenue calculation, freshness metrics, late-arrival indicators, validation flags, invalid-reason classification, and transformation audit timestamps.
 
-- retain latest transaction version
-- support replay-aware ingestion
-- remove duplicate revenue impact
+Partitioned by `DATE(transaction_time)` and clustered by `store_id, is_valid`.
 
-## SAFE_CAST Transformation
-
-Bronze stored:
-
-```text
-quantity STRING
-unit_price STRING
-```
-
-Silver transformed them into:
-
-```text
-quantity INT64
-unit_price FLOAT64
-```
-
-using:
-
-```sql
-SAFE_CAST()
-```
-
-Benefits:
-
-- resilient dirty-data handling
-- graceful pipeline execution
-- operational robustness
-
-## Validation Logic
-
-Implemented validation rules for:
-
-| Field | Validation Rule |
-|---|---|
-| transaction_id | not NULL / not empty |
-| product_id | not NULL / not empty |
-| quantity | > 0 |
-| unit_price | > 0 |
-| transaction_time | not NULL |
-
-Generated:
-
-- is_valid
-- invalid_reason
-
-## Freshness Enrichment
-
-Generated:
-
-- freshness_minutes
-- is_late
-- is_significantly_late
-
-using:
-
-```sql
-TIMESTAMP_DIFF()
-```
-
-## Additional Enrichment
-
-Generated:
-
-- total_amount
-- silver_processed_at
-
-## Partitioning & Clustering
-
-```sql
-PARTITION BY DATE(transaction_time)
-CLUSTER BY store_id, is_valid
-```
-
-Benefits:
-
-- partition pruning
-- lower scan cost
-- optimized analytics filtering
+**Implementation:** `sql/04_silver_transform.sql`
 
 ---
 
-# 10. Phase 5 — Data Quality Monitoring
+## Data Quality & Observability
 
-## Objective
+Operational monitoring queries provide:
 
-Implement production-style operational quality monitoring queries.
+- late-arriving data rate analysis
+- significantly late data monitoring
+- invalid record classification
+- Bronze vs Silver reconciliation
+- batch-level reconciliation
+- freshness distribution analysis
+- business-level revenue validation
 
-## SQL File
+Suggested data quality thresholds:
 
-```text
-sql/05_data_quality.sql
+```sql
+-- Late data rate:
+--   < 10% is considered acceptable
+--
+-- Invalid record rate:
+--   < 5% is considered acceptable
+--
+-- Duplicate records in Silver:
+--   Target = 0 duplicate transaction_id values
 ```
 
-## Implemented Monitoring Queries
-
-| Query | Purpose |
-|---|---|
-| Late-arriving data rate | SLA monitoring |
-| Store-level late analysis | operational diagnostics |
-| Significantly late monitoring | outage detection |
-| Invalid record monitoring | quality observability |
-| Bronze vs Silver reconciliation | pipeline validation |
-| Batch-level reconciliation | ingestion diagnostics |
-| Freshness distribution | SLA trend analysis |
-| Revenue validation | business-readiness validation |
-
-## Operational Alerting Concepts
-
-Suggested thresholds:
-
-| Metric | Warning | Critical |
-|---|---|---|
-| Late-arriving percentage | >5% | >15% |
-| Significantly late percentage | >1% | >5% |
-| Invalid record percentage | >2% | >10% |
+**Implementation:** `sql/05_data_quality.sql`
 
 ---
 
-# 11. How to Run the Project
+## Operational Focus
 
-## Step 1 — Clone Repository
+The implementation prioritizes replayability, auditability, and observability over aggressive cleansing. Invalid records are retained with classification flags, deduplication is deferred to Silver using latest-ingestion semantics, and freshness metrics are modeled explicitly to support SLA monitoring and reconciliation workflows.
 
-```powershell
-git clone <your-github-repo-url>
-cd cloud-data-engineer-assignment
-```
+---
 
-## Step 2 — Create Virtual Environment
+## Design Decisions
 
-```powershell
-python -m venv venv
-```
+- Bronze intentionally preserves dirty values and duplicate records
+- Deduplication is deferred to Silver using latest-ingestion semantics
+- Event time and ingestion time are modeled separately for freshness analysis
+- Invalid Silver records are retained instead of dropped
+- Partitioning and clustering are optimized for analytical and operational query patterns
 
-## Step 3 — Activate Virtual Environment
+---
 
-```powershell
-.\venv\Scripts\Activate
-```
+## GCP & BigQuery Setup
 
-## Step 4 — Install Dependencies
+**Dataset:** `retail`
 
-```powershell
-pip install pandas google-cloud-bigquery
-```
+**Tables:**
+- `retail.bronze_transactions`
+- `retail.silver_transactions`
 
-## Step 5 — Generate Data
+Required permissions:
 
-```powershell
-python generate_data.py
-```
+- BigQuery Data Editor
+- BigQuery Job User
 
-Generated files:
+The implementation assumes authenticated access to a GCP project with permission to create datasets, tables, and execute BigQuery jobs.
 
-```text
-data/batches/
-```
+---
 
-## Step 6 — Create Bronze Table
+## Execution
 
-Run:
+1. Run `generate_data.py` to generate batch CSVs
+2. Load CSV batches into `retail.bronze_transactions` using append-only ingestion
+3. Execute SQL scripts in order:
 
 ```text
 sql/02_bronze_load.sql
-```
-
-inside BigQuery.
-
-## Step 7 — Load CSV Batches into Bronze
-
-Load:
-
-- batch_01.csv
-- batch_02.csv
-- batch_03.csv
-
-into:
-
-```text
-retail.bronze_transactions
-```
-
-Configuration:
-
-- append-only loading
-- skip header rows = 1
-
-## Step 8 — Run Data Profiling Queries
-
-Run:
-
-```text
 sql/03_issues_identification.sql
-```
-
-## Step 9 — Create Silver Table
-
-Run:
-
-```text
 sql/04_silver_transform.sql
-```
-
-## Step 10 — Execute Data Quality Monitoring
-
-Run:
-
-```text
 sql/05_data_quality.sql
 ```
 
+Bronze ingestion configuration:
+
+- source format: CSV
+- skip header rows = 1
+- append-only loading
+
 ---
 
-# 12. Assumptions
+## Assumptions & Limitations
 
-The following assumptions were made:
-
-- duplicate transactions simulate replay/retry behavior
+**Assumptions**
+- duplicates simulate replay/retry ingestion behavior
 - latest ingestion version should be retained
-- Bronze must preserve dirty values exactly
-- invalid Silver rows should be retained with flags
-- event time and ingestion time are intentionally different
-- freshness calculations are based on ingestion delay
+- Bronze preserves raw source values exactly
+- invalid Silver records remain queryable
+- freshness is calculated using ingestion delay
+- late-arriving threshold defined as >120 minutes
+- significantly late threshold defined as >1440 minutes
 
----
-
-# 13. Limitations
-
-Current implementation limitations:
-
-- no orchestration framework (Airflow/Dataform/dbt)
-- no automated scheduling
+**Current limitations**
+- no orchestration framework
 - no streaming ingestion
 - no automated alerting integration
-- no unit testing framework
-- no CI/CD pipeline
-- no GCS integration layer
+- no CI/CD implementation
+- no automated testing framework
+- no incremental MERGE-based processing
 
 ---
 
-# 14. Future Improvements
+## Future Enhancements
 
-Potential production enhancements:
-
-- implement orchestration using Airflow
-- integrate GCS landing zone
-- add dbt transformation framework
-- implement CI/CD pipelines
-- add automated alerting
-- add schema evolution handling
-- add unit and integration testing
-- implement data contracts
-- integrate monitoring dashboards
+- orchestration using Airflow
+- dbt-based transformation framework
+- incremental Silver processing
+- automated alerting integration
+- schema evolution handling
+- CI/CD pipelines
+- monitoring dashboards
+- automated testing framework
+- GCS landing zone integration
 
 ---
 
-# 15. Key Production Engineering Concepts Demonstrated
+## Validation Results
 
-This assignment demonstrates:
+Observed results from the executed pipeline:
 
-- medallion architecture understanding
-- immutable Bronze ingestion design
+| Metric | Result |
+|---|---:|
+| Total Bronze rows | 100,000 |
+| Duplicate transaction rows | 2,423 |
+| Invalid quantity rows | 1,270 |
+| Invalid unit_price rows | 1,210 |
+| Missing product_id rows | 1,280 |
+| Late-arriving rows (batch_02) | 825 |
+| Late-arriving rows (batch_03) | 1,017 |
+| Significantly late rows (batch_03) | 177 |
+
+Silver-layer validation confirmed:
+
+- replay-aware deduplication applied successfully
+- invalid records classified using `invalid_reason`
+- freshness metrics generated correctly
+- Bronze → Silver reconciliation logic executed successfully
+
+---
+
+## Final Outcome
+
+The implemented solution demonstrates:
+
+- production-style medallion architecture
+- immutable Bronze ingestion
 - replay-aware deduplication
-- dirty-data preservation philosophy
 - late-arriving data handling
-- event-time vs processing-time reasoning
+- validation-driven Silver transformation
 - operational observability
-- reconciliation thinking
-- BigQuery optimization awareness
-- maintainable SQL engineering
-- analytics-ready modeling
-- enterprise-style quality monitoring
+- reconciliation-first engineering mindset
+- BigQuery optimization strategy
+- analytics-ready transaction modeling
 
----
-
-# 16. Final Architecture
-
-```text
-CSV Batch Files
-        ↓
-retail.bronze_transactions
-        ↓
-Data Profiling Queries
-        ↓
-retail.silver_transactions
-        ↓
-Operational Quality Monitoring
-        ↓
-Analytics & Reporting
-```
-
----
-
-# 17. Final Outcome
-
-The completed solution successfully implements:
-
-✅ realistic POS transaction simulation
-✅ Bronze raw ingestion layer
-✅ dirty-data preservation
-✅ replay-aware duplicate handling
-✅ Silver transformation layer
-✅ validation-driven cleansing
-✅ late-arriving data monitoring
-✅ analytics-ready transaction modeling
-✅ reconciliation framework
-✅ operational quality monitoring
-✅ BigQuery optimization strategy
-✅ production-style engineering practices
-
-The final implementation resembles a simplified enterprise retail lakehouse pipeline built on GCP and BigQuery.
-
+The final implementation resembles an enterprise-style retail lakehouse pipeline built on GCP BigQuery.
