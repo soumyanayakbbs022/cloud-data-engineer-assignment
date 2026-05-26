@@ -235,6 +235,9 @@ Bronze ingestion configuration:
 - latest ingestion version is retained
 - Bronze preserves source data in “as-is” form
 - late-arriving threshold defined as >120 minutes
+- duplicate metrics include both original and replayed records
+- invalid Silver records are retained with quality flags to support auditability and observability
+
 
 **Current limitations**
 - no orchestration or CI/CD
@@ -273,15 +276,6 @@ Silver-layer validation confirmed:
 - invalid records classified using `invalid_reason`
 - freshness metrics generated correctly
 - Bronze → Silver reconciliation logic executed successfully
-
----
-
-## Caveats
-
-- Replay-driven duplicate behavior was intentionally modeled across multiple ingestion batches to simulate retry and reprocessing scenarios.
-- Duplicate metrics represent all rows participating in replay groups, including original and replayed records.
-- Invalid records are intentionally retained in Silver with quality flags for auditability and downstream observability rather than being dropped.
-- The implementation prioritizes operational realism and observability over perfectly deterministic synthetic data distribution.
 
 ---
 
